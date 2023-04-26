@@ -3,15 +3,12 @@ from elasticsearch_dsl import Search, Q
 # TODO: Look into if MoreLikeThis works better
 from elasticsearch_dsl.query import MoreLikeThis
 
-# TODO: read dict from file
+import json
 
+with open('categories.json') as json_file:
+    preferences_categories = json.load(json_file)
 # the idea is that the number corresponds to how many articles that the user (dis-)liked with that category.
 # we can probably do the same with author
-preferences_categories = {
-    "POLITICS": 1,
-    "ENTERTAINMENT": 7,
-    "SPORTS": -7
-}
 
 # Create the client instance
 client = Elasticsearch(
@@ -35,7 +32,7 @@ q = Q('bool',
       must_not=must_not_list,
       minimum_should_match=0
       )
-s = Search(using=client, index="news").query(q)
+s = Search(using=client, index="new_news").query(q)
 '''
 s = Search(using=client, index="news").query(
     "match", headline=search_query).query(
@@ -47,10 +44,14 @@ print("The top", len(response), "results are")
 for index, hit in enumerate(response):
     print("----")
     print(str(index) + ":", hit.meta.score,
-          "Title:", hit.headline, "\n Description: ", hit.short_description, hit.category)
+          "Title:", hit.headline, hit.tags)
 
 article_index = int(input("Which article do you want to read? "))
 
-print(response[article_index].link)
+print(response[article_index].text)
+
+
+with open("categories.json", "w") as outfile:
+    json.dump(preferences_categories, outfile)
 
 # TODO let the user score results and save to the dict
