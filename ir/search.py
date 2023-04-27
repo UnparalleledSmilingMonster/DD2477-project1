@@ -22,9 +22,9 @@ should_list = []
 must_not_list = []
 for key, value in preferences_categories.items():
     if value > 2:  # TODO decide when we can assume that the user likes an category
-        should_list.append(Q("match", category=key))
+        should_list.append(Q("match", tags=key))
     elif value < -3:  # and same for dislikes
-        must_not_list.append(Q("match", category=key))
+        must_not_list.append(Q("match", tags=key))
 
 q = Q('bool',
       must=[Q('match', headline=search_query)],
@@ -34,16 +34,35 @@ q = Q('bool',
       )
 s = Search(using=client, index="new_news").query(q)
 
-'''
-s = Search(using=client, index="news").query(
-    MoreLikeThis(like={"_id": "1"}, fields=['text'], min_term_freq=1, min_doc_freq=1))  # .exclude() # this might be the way to go for recommendation service if we manage to get like _docid to work
-'''
+
+""" s = Search(using=client, index="news").query(
+    MoreLikeThis(like={"_index": "new_news", "_id": "a8ravYcB2gD1FxEPMjHL"}, fields=["headline"], min_term_freq=1, min_doc_freq=1))  # .exclude() # this might be the way to go for recommendation service if we manage to get like _docid to work
+ """
+""" might need to use normal elasticsearch (not dsl for this type of search)
+ GET new_news/_search
+{
+  "query": {
+    "more_like_this": {
+      "fields": [ "headline", "text" ],
+      "like": [
+        {
+          "_index": "new_news",
+          "_id": "a8ravYcB2gD1FxEPMjHL"
+        }
+      ],
+      "min_term_freq": 1,
+      "max_query_terms": 12
+    }
+  }
+}
+"""
+
 response = s.execute()
 
 print("The top", len(response), "results are")
 for index, hit in enumerate(response):
     print("----")
-    print(str(index) + ":", hit.meta.score,
+    print(str(index), "("+hit.meta.id+")" + ":", hit.meta.score,
           "Title:", hit.headline, hit.tags)
 
 article_index = int(input("Which article do you want to read? "))
