@@ -6,9 +6,9 @@ from elasticsearch_dsl.query import MoreLikeThis
 import json
 
 with open('categories.json') as json_file:
-    preferences_categories = json.load(json_file)
+    preferences_categories: dict = json.load(json_file)
 # the idea is that the number corresponds to how many articles that the user (dis-)liked with that category.
-# we can probably do the same with author
+# we can probably do the same with author and make two ints for length(should probably just be used for recommendation without query)
 
 # Create the client instance
 client = Elasticsearch(
@@ -29,14 +29,14 @@ for key, value in preferences_categories.items():
 q = Q('bool',
       must=[Q('match', headline=search_query)],
       should=should_list,
-      must_not=must_not_list,
+      must_not=must_not_list,  # this will not be used if we just have positive feedback
       minimum_should_match=0
       )
 s = Search(using=client, index="new_news").query(q)
+
 '''
 s = Search(using=client, index="news").query(
-    "match", headline=search_query).query(
-    MoreLikeThis(like='SPORTS', fields=['category']))  # .exclude()
+    MoreLikeThis(like={"_id": "1"}, fields=['text'], min_term_freq=1, min_doc_freq=1))  # .exclude() # this might be the way to go for recommendation service if we manage to get like _docid to work
 '''
 response = s.execute()
 
@@ -50,6 +50,11 @@ article_index = int(input("Which article do you want to read? "))
 
 print(response[article_index].text)
 
+for tag in response[article_index].tags:
+    if tag in preferences_categories:
+        preferences_categories[tag] += 1
+    else:
+        preferences_categories[tag] = 1
 
 with open("categories.json", "w") as outfile:
     json.dump(preferences_categories, outfile)
