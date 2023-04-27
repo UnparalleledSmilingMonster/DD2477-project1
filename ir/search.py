@@ -29,33 +29,19 @@ for key, value in preferences_categories.items():
 q = Q('bool',
       must=[Q('match', headline=search_query)],
       should=should_list,
-      must_not=must_not_list,  # this will not be used if we just have positive feedback
+      # this will not be used if we just have positive (implicit) feedback
+      must_not=must_not_list,
       minimum_should_match=0
       )
-s = Search(using=client, index="new_news").query(q)
+# s = Search(using=client, index="new_news").query(q)
 
 
-""" s = Search(using=client, index="news").query(
-    MoreLikeThis(like={"_index": "new_news", "_id": "a8ravYcB2gD1FxEPMjHL"}, fields=["headline"], min_term_freq=1, min_doc_freq=1))  # .exclude() # this might be the way to go for recommendation service if we manage to get like _docid to work
- """
-""" might need to use normal elasticsearch (not dsl for this type of search)
- GET new_news/_search
-{
-  "query": {
-    "more_like_this": {
-      "fields": [ "headline", "text" ],
-      "like": [
-        {
-          "_index": "new_news",
-          "_id": "a8ravYcB2gD1FxEPMjHL"
-        }
-      ],
-      "min_term_freq": 1,
-      "max_query_terms": 12
-    }
-  }
-}
-"""
+# This can be the reccomendation service, only thing we need to add is that the date should be near today.
+s = Search(using=client, index="news").query(
+    MoreLikeThis(like={"_index": "new_news", "_id": "a8ravYcB2gD1FxEPMjHL"}, fields=[
+                 "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1)
+    | MoreLikeThis(like={"_index": "new_news", "_id": "lsravYcB2gD1FxEPKShd"}, fields=["tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1))
+
 
 response = s.execute()
 
@@ -63,7 +49,7 @@ print("The top", len(response), "results are")
 for index, hit in enumerate(response):
     print("----")
     print(str(index), "("+hit.meta.id+")" + ":", hit.meta.score,
-          "Title:", hit.headline, hit.tags)
+          "Title:", hit.headline, hit.tags, "Written by:", hit.authors)
 
 article_index = int(input("Which article do you want to read? "))
 
