@@ -26,6 +26,8 @@ from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QTextEdit 
+from PyQt5.QtWidgets import QListWidget
+from PyQt5.QtWidgets import QListWidgetItem
 from PyQt5.QtCore import QEventLoop
 from PyQt5.QtCore import Qt
 
@@ -56,16 +58,17 @@ def write_user(filename, username, preferences):
 
 class MainWindow(QWidget):    
 
-    def __init__(self, tags_topics):
+    def __init__(self, tags_topics, address, user_fl, index ):
         super().__init__()
         self.layout = QGridLayout(self) 
         self.set_window()
         self.define_widgets()    
         self.username = "" 
         self.tags_topics = tags_topics
-        self.client =  Elasticsearch("http://localhost:9200")
-        self.filename = "users.json"
+        self.client =  Elasticsearch(address)
+        self.filename = user_fl 
         self.preferences = None
+        self.index = index
                 
         
     def set_window(self):
@@ -150,6 +153,7 @@ class PreferencesWindow(QWidget):
 
 
     def define_widgets(self):
+        
         ok = QPushButton("Confirm", parent = self)
         ok.clicked.connect(self.forward)
 
@@ -208,23 +212,33 @@ class SearchWindow(QWidget):
        
     def set_window(self):
         self.setWindowTitle("Search Window")
-        self.setGeometry(350, 550, 500, 300)
-        self.setFixedWidth(500)
-        self.setFixedHeight(300)         
+        self.setGeometry(300, 300, 600, 700)     
+        self.setFixedWidth(600)
+        self.setFixedHeight(700)        
 
 
     def define_widgets(self):
-    
+        text = QLabel(text ="Query Search", parent = self)
+        self.layout.addWidget(text, 0 ,0)
+       
+
+        self.text_input = QLineEdit(parent = self)
+        self.text_input.setPlaceholderText('Use keywords')
+        self.layout.addWidget(self.text_input, 0,1)
+      
+        search = QPushButton("Search", parent = self)
+        search.clicked.connect(self.search)
+        self.layout.addWidget(search, 0,2)
+        
+        self.list_search = QListWidget(parent = self)
+        self.layout.addWidget(self.list_search, 1,1)
+
+        
+        
         quit = QPushButton("Quit", parent = self)
         quit.clicked.connect(self.menu)
-        self.layout.addWidget(quit, 2,0)
+        self.layout.addWidget(quit, 4,0)
         
-        ok = QPushButton("Search", parent = self)
-        ok.clicked.connect(self.search)
-        self.layout.addWidget(ok, 2,2)
-
-        text = QLabel(text ="Username", parent = self)
-        self.layout.addWidget(text, 0 ,0)
        
         self.setLayout(self.layout)
         
@@ -234,15 +248,36 @@ class SearchWindow(QWidget):
       
     
         
-    def search(self):
-       return 0
+    def search(self):  
+        search_query = self.text_input.text()
+        if search_query == "":
+            QMessageBox.about(self, "Warning", "No query input.")
+            pass
+        should_list = []
+        preferences_categories = {}
+        
+        for i in range(len(self.preferences)):
+            if self.preferences[i] > 0 :
+                preferences_categories[self.tags_topics[i]] = self.preferences[i]
+            
+            
+        for key, value in preferences_categories.items():
+            if value > 2:
+                should_list.append(Q("match", tags=key))
+
+        searches = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)).execute()
+        self.list_search.clear()
+        self.mem = {}
+        for index, hit in enumerate(searches):
+            QListWidgetItem(str(index) + " " + hit.headline , self.list_search)
+            self.mem[index] = hit.meta.id
     
 ############################################################################
 
 
 app = QApplication(sys.argv)
-
-gui_new_user = MainWindow(["politics", "wellness", "entertainment", "travel", "style & beauty", "parenting", "healthy living", "queer voices", "food & drink", "business", "comedy", "sports", "black voices", "home & living", "parents"])
+tags = ["politics", "wellness", "entertainment", "travel", "style & beauty", "parenting", "healthy living", "queer voices", "food & drink", "business", "comedy", "sports", "black voices", "home & living", "parents"]
+gui_new_user = MainWindow(tags,"http://localhost:9200", "users.json", "new_news" )
 gui_new_user.show()
   
 # Run application's main loop
