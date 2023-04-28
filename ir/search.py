@@ -1,6 +1,7 @@
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search, Q
 from elasticsearch_dsl.query import MoreLikeThis
+from math import asin, pi
 
 import json
 
@@ -10,7 +11,7 @@ def query(preferences_categories: dict) -> Q:
     should_list = []
     must_not_list = []
     for key, value in preferences_categories.items():
-        if value > 2:  # TODO decide when we can assume that the user likes an category
+        if value > 2:  # TODO decide when we can assume that the user likes an category and add some kind of boost for more popular categories
             should_list.append(Q("match", tags=key))
         elif value < -3:  # and same for dislikes
             must_not_list.append(Q("match", tags=key))
@@ -27,13 +28,13 @@ def query(preferences_categories: dict) -> Q:
 def recommendation(reading_history: list) -> Q:
     q = Q()
     print(q)
-    for i, id in enumerate(reading_history):
+    for i, id in enumerate(reversed(reading_history)):
         if i == 0:
             q = Q(MoreLikeThis(like={"_index": "new_news", "_id": id.strip()}, fields=[
-                  "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1))
+                  "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(reading_history))))  # TODO maybe have another scoring function
         else:
             q |= Q(MoreLikeThis(like={"_index": "new_news", "_id": id.strip()}, fields=[
-                   "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1))
+                   "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(reading_history))))
     print(q)
     return q
 
