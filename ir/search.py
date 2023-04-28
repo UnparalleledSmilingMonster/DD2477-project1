@@ -9,25 +9,19 @@ import json
 def query(preferences_categories: dict) -> Q:
     search_query = input("Enter search query: ")
     should_list = []
-    must_not_list = []
     for key, value in preferences_categories.items():
-        if value > 2:  # TODO decide when we can assume that the user likes an category and add some kind of boost for more popular categories
+        if value > 2:
             should_list.append(Q("match", tags=key))
-        elif value < -3:  # and same for dislikes
-            must_not_list.append(Q("match", tags=key))
 
     return Q('bool',
              must=[Q('match', headline=search_query)],
              should=should_list,
-             # this will not be used if we just have positive (implicit) feedback
-             must_not=must_not_list,
              minimum_should_match=0
              )
 
 
 def recommendation(reading_history: list) -> Q:
-    q = Q()
-    print(q)
+    q = Q()  # TODO filter dates to get recent articles
     for i, id in enumerate(reversed(reading_history)):
         if i == 0:
             q = Q(MoreLikeThis(like={"_index": "new_news", "_id": id.strip()}, fields=[
@@ -35,22 +29,19 @@ def recommendation(reading_history: list) -> Q:
         else:
             q |= Q(MoreLikeThis(like={"_index": "new_news", "_id": id.strip()}, fields=[
                    "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(reading_history))))
-    print(q)
     return q
 
 
 def main():
-    reading_history = []  # We should limit this somehow if it is big
+    reading_history = []
     with open("history.txt") as f:
         for id in f:
             reading_history.append(id.strip())
 
     with open('categories.json') as json_file:
         preferences_categories: dict = json.load(json_file)
-    # the idea is that the number corresponds to how many articles that the user (dis-)liked with that category.
     # we can probably do the same with author and make two ints for length(should probably just be used for recommendation without query)
 
-    # Create the client instance
     client = Elasticsearch(
         "http://localhost:9200"
     )
@@ -62,6 +53,7 @@ def main():
     else:
         q = recommendation(reading_history)
 
+    # will only produce ten results, we can use scan() to get more: https://stackoverflow.com/questions/53729753/how-to-get-all-results-from-elasticsearch-in-python
     s = Search(using=client, index="new_news").query(q)
 
     response = s.execute()
@@ -85,7 +77,6 @@ def main():
     with open("categories.json", "w") as outfile:
         json.dump(preferences_categories, outfile)
 
-    print(reading_history)
     with open("history.txt", "w") as f:
         for id in reading_history:
             f.write("%s\n" % id)
