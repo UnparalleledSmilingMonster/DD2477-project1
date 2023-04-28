@@ -28,12 +28,17 @@ from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QTextEdit 
 from PyQt5.QtWidgets import QListWidget
 from PyQt5.QtWidgets import QListWidgetItem
+from PyQt5.QtWidgets import QStackedLayout
 from PyQt5.QtCore import QEventLoop
 from PyQt5.QtCore import Qt
+
 
 # [{"user":"0", "preferences":[]}] : users.json default
 
 def check_user(filename, username):
+    """ 
+    Checks if the input username already exists in the user base.
+    """
     with open(filename, 'r') as f:
         data = json.load(f)  
         for entry in data:  
@@ -42,6 +47,9 @@ def check_user(filename, username):
     return False, None
     
 def write_user(filename, username, preferences):
+    """ 
+    Writes new user to the user base. With preferences vector (one hot encoded)
+    """
     with open("users.json", 'r+') as f:
         f.seek(0, 2)  # seek to end of file; f.seek(0, os.SEEK_END) is legal
         f.seek(f.tell() - 2, 0)
@@ -56,7 +64,10 @@ def write_user(filename, username, preferences):
     
     
 
-class MainWindow(QWidget):    
+class MainWindow(QWidget):  
+    """
+    Main window. Login / Create user window.
+    """  
 
     def __init__(self, tags_topics, address, user_fl, index ):
         super().__init__()
@@ -136,6 +147,9 @@ class MainWindow(QWidget):
 ############################################################################
 
 class PreferencesWindow(QWidget):
+    """
+    Window to select preferences. (Cold start problem : select at least 3 positive)
+    """
     def __init__(self, parent, tags_topics):
         super().__init__()
         self.parent = parent
@@ -188,6 +202,10 @@ class PreferencesWindow(QWidget):
         
             
     def forward(self):
+        if np.linalg.norm(self.preferences) < 3 :
+            QMessageBox.about(self, "Cold start !", "Select at least 3 positive preferences.")
+            pass
+            
         write_user(self.parent.filename, self.parent.username, list(self.preferences))
         self.parent.search_window = SearchWindow(self.parent, self.tags_topics, self.preferences)
         self.parent.search_window.show()
@@ -201,6 +219,10 @@ class PreferencesWindow(QWidget):
 
 
 class SearchWindow(QWidget):
+    """
+    Window for the user to input search queries.
+    TODO : implement recommendation without query
+    """
     def __init__(self, parent, tags_topics, preferences):
         super().__init__()
         self.parent = parent
@@ -209,6 +231,7 @@ class SearchWindow(QWidget):
         self.preferences = preferences
         self.set_window()
         self.define_widgets()
+
        
     def set_window(self):
         self.setWindowTitle("Search Window")
@@ -221,18 +244,24 @@ class SearchWindow(QWidget):
         text = QLabel(text ="Query Search", parent = self)
         self.layout.addWidget(text, 0 ,0)
        
-
+        
         self.text_input = QLineEdit(parent = self)
         self.text_input.setPlaceholderText('Use keywords')
         self.layout.addWidget(self.text_input, 0,1)
-      
-        search = QPushButton("Search", parent = self)
-        search.clicked.connect(self.search)
-        self.layout.addWidget(search, 0,2)
+        
+        self.search = QPushButton("Search", parent = self)
+        self.search.clicked.connect(self.query_search)
+        self.layout.addWidget(self.search, 0, 2)
+                
+        self.stack = QStackedLayout()
+        self.layout.addLayout(self.stack, 1,1)      
+
+        self.text_field = QTextEdit(self)
+        self.text_field.setReadOnly(True)
+        self.stack.addWidget(self.text_field)
         
         self.list_search = QListWidget(parent = self)
-        self.layout.addWidget(self.list_search, 1,1)
-
+        self.stack.addWidget(self.list_search)
         
         
         quit = QPushButton("Quit", parent = self)
@@ -247,30 +276,54 @@ class SearchWindow(QWidget):
         self.close() 
       
     
+    def translate_preferences(self):
+        pref_cat = {}
+        for i in range(len(self.preferences)):
+            if self.preferences[i] > 0 :
+                pref_cat[self.tags_topics[i]] = self.preferences[i]
+        return pref_cat
+    
         
-    def search(self):  
+    def query_search(self):  
+        self.stack.setCurrentIndex(1)
+
+        self.text_field.clear()
         search_query = self.text_input.text()
         if search_query == "":
             QMessageBox.about(self, "Warning", "No query input.")
             pass
         should_list = []
-        preferences_categories = {}
-        
-        for i in range(len(self.preferences)):
-            if self.preferences[i] > 0 :
-                preferences_categories[self.tags_topics[i]] = self.preferences[i]
-            
-            
+        preferences_categories = self.translate_preferences()           
         for key, value in preferences_categories.items():
             if value > 2:
                 should_list.append(Q("match", tags=key))
 
-        searches = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)).execute()
+        self.searches = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)).execute()
         self.list_search.clear()
         self.mem = {}
-        for index, hit in enumerate(searches):
+        fcts = []
+        for i in range(len(self.searches)):
+            fcts.append(partial(self.read_article, i))
+            
+        for index, hit in enumerate(self.searches):
+            self.mem[index-1] = hit.meta.id
             QListWidgetItem(str(index) + " " + hit.headline , self.list_search)
-            self.mem[index] = hit.meta.id
+        
+        self.list_search.itemClicked.connect(self.read_article)
+       
+            
+    def read_article(self, item):
+        self.stack.setCurrentIndex(0)
+        index = int(item.text().split(" ")[0])
+        self.list_search.clear()
+        self.list_search.itemClicked.disconnect()
+        self.text_field.insertPlainText(self.searches[index-1].text)
+
+       
+        
+        
+        
+        
     
 ############################################################################
 
