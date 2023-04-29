@@ -222,6 +222,7 @@ class SearchWindow(QWidget):
     """
     Window for the user to input search queries.
     TODO : implement recommendation without query
+    TODO : add read articles to history (should add it to json user)
     """
     def __init__(self, parent, tags_topics, preferences):
         super().__init__()
@@ -263,6 +264,11 @@ class SearchWindow(QWidget):
         self.list_search = QListWidget(parent = self)
         self.stack.addWidget(self.list_search)
         
+        self.previous = QPushButton("Previous", parent = self)
+        self.previous.clicked.connect(self.prev_list)
+        self.layout.addWidget(self.previous, 1, 2)
+        self.previous.hide()
+        
         
         quit = QPushButton("Quit", parent = self)
         quit.clicked.connect(self.menu)
@@ -274,6 +280,12 @@ class SearchWindow(QWidget):
     def menu(self):   
         self.parent.show()
         self.close() 
+        
+    def prev_list(self):
+        self.previous.hide()
+        self.stack.setCurrentIndex(1)
+        self.list_search.itemClicked.connect(self.read_article)
+         
       
     
     def translate_preferences(self):
@@ -285,6 +297,7 @@ class SearchWindow(QWidget):
     
         
     def query_search(self):  
+        self.previous.hide()
         self.stack.setCurrentIndex(1)
 
         self.text_field.clear()
@@ -313,10 +326,11 @@ class SearchWindow(QWidget):
        
             
     def read_article(self, item):
+        self.previous.show()
         self.stack.setCurrentIndex(0)
         index = int(item.text().split(" ")[0])
-        self.list_search.clear()
         self.list_search.itemClicked.disconnect()
+        self.text_field.clear()
         self.text_field.insertPlainText(self.searches[index-1].text)
 
        
