@@ -5,7 +5,7 @@ import json
 
 
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Search, Q
+from elasticsearch_dsl import Search, Q, Index
 from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
 from search import query, recommendation
@@ -35,6 +35,48 @@ from PyQt5.QtCore import Qt
 
 # [{"user":"0", "preferences":[]}] : users.json default
 
+class User(Document):
+    username = Text()
+    preferences = 
+    history = 
+
+
+    def is_published(self):
+        return self.published and datetime.now() > self.published
+
+    @classmethod
+    def _matches(cls, hit):
+        # override _matches to match indices in a pattern instead of just ALIAS
+        # hit is the raw dict as returned by elasticsearch
+        return fnmatch(hit["_index"], PATTERN)
+
+    class Index:
+        # we will use an alias instead of the index
+        name = ALIAS
+        # set settings and possibly other attributes of the index like
+        # analyzers
+        settings = {"number_of_shards": 1, "number_of_replicas": 0}
+
+
+def set_elastic_search(client):
+    index_user = Index("users")
+    if not index_user.exists(using=client):
+        print("Index 'users' does not exist yet. Creating it ...")
+        index_user.create(using=client)
+    
+    
+def check_user_es(client, index, username):
+    
+
+def write_user_es(client, index, username, preferences, history = []):
+    entry = {}
+    entry["user"] = username
+    entry["preferences"] = preferences
+    entry["history"] = history
+    
+    json.dumps(entry).save(client = client, index = index)
+        
+
 def check_user(filename, username):
     """ 
     Checks if the input username already exists in the user base.
@@ -42,9 +84,9 @@ def check_user(filename, username):
     with open(filename, 'r') as f:
         data = json.load(f)  
         for entry in data:  
-            if entry["user"] == username : return True, entry["preferences"]
+            if entry["user"] == username : return True, entry["preferences"], entry["history"]
         f.close()
-    return False, None
+    return False, None, []
     
 def write_user(filename, username, preferences):
     """ 
@@ -58,6 +100,7 @@ def write_user(filename, username, preferences):
         entry = {}
         entry["user"] = username
         entry["preferences"] = preferences
+        entry["history"] = []
         json.dump(entry, f, separators=(',',': '))
         f.write(']')
         f.close() 
@@ -77,6 +120,7 @@ class MainWindow(QWidget):
         self.username = "" 
         self.tags_topics = tags_topics
         self.client =  Elasticsearch(address)
+        set_elastic_search(self.client)
         self.filename = user_fl 
         self.preferences = None
         self.index = index
@@ -116,9 +160,9 @@ class MainWindow(QWidget):
         self.username = self.text_input.text()
         if self.username == "":
             QMessageBox.about(self, "Warning", "No name provided.")
-            pass
+            return 
         
-        status, self.preferences  = check_user(self.filename, self.username)
+        status, self.preferences, self.history  = check_user(self.filename, self.username)
         if not status :  
             self.hide()
             self.ld_window = PreferencesWindow(self, self.tags_topics)
@@ -129,7 +173,7 @@ class MainWindow(QWidget):
             loop.exec() 
         
         else :
-            self.search_window = SearchWindow(self, self.tags_topics, self.preferences)
+            self.search_window = SearchWindow(self, self.tags_topics, self.preferences, self.history)
             self.search_window.show()
             self.hide()
             loop = QEventLoop()
@@ -202,12 +246,12 @@ class PreferencesWindow(QWidget):
         
             
     def forward(self):
-        if np.linalg.norm(self.preferences) < 3 :
+        if len(self.preferences[self.preferences == 1]) < 3 :
             QMessageBox.about(self, "Cold start !", "Select at least 3 positive preferences.")
-            pass
+            return
             
         write_user(self.parent.filename, self.parent.username, list(self.preferences))
-        self.parent.search_window = SearchWindow(self.parent, self.tags_topics, self.preferences)
+        self.parent.search_window = SearchWindow(self.parent, self.tags_topics, self.preferences, self.parent.history)
         self.parent.search_window.show()
         self.hide() 
         loop = QEventLoop()
@@ -224,14 +268,16 @@ class SearchWindow(QWidget):
     TODO : implement recommendation without query
     TODO : add read articles to history (should add it to json user)
     """
-    def __init__(self, parent, tags_topics, preferences):
+    def __init__(self, parent, tags_topics, preferences, history):
         super().__init__()
         self.parent = parent
         self.layout = QGridLayout(self) 
         self.tags_topics = tags_topics
         self.preferences = preferences
+        self.history = history
         self.set_window()
         self.define_widgets()
+        self.recommendations()
 
        
     def set_window(self):
@@ -253,9 +299,14 @@ class SearchWindow(QWidget):
         self.search = QPushButton("Search", parent = self)
         self.search.clicked.connect(self.query_search)
         self.layout.addWidget(self.search, 0, 2)
+        
+        self.reco = QPushButton("News Recommendations", parent = self)
+        self.reco.clicked.connect(self.recommendations)
+        self.layout.addWidget(self.reco, 1, 1)
+        
                 
         self.stack = QStackedLayout()
-        self.layout.addLayout(self.stack, 1,1)      
+        self.layout.addLayout(self.stack, 2,1)      
 
         self.text_field = QTextEdit(self)
         self.text_field.setReadOnly(True)
@@ -266,7 +317,7 @@ class SearchWindow(QWidget):
         
         self.previous = QPushButton("Previous", parent = self)
         self.previous.clicked.connect(self.prev_list)
-        self.layout.addWidget(self.previous, 1, 2)
+        self.layout.addWidget(self.previous, 2, 2)
         self.previous.hide()
         
         
@@ -313,7 +364,7 @@ class SearchWindow(QWidget):
 
         self.searches = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)).execute()
         self.list_search.clear()
-        self.mem = {}
+        self.mem = {} #stores articles ids
         fcts = []
         for i in range(len(self.searches)):
             fcts.append(partial(self.read_article, i))
@@ -332,6 +383,14 @@ class SearchWindow(QWidget):
         self.list_search.itemClicked.disconnect()
         self.text_field.clear()
         self.text_field.insertPlainText(self.searches[index-1].text)
+        self.add_history(self.mem[index-1])
+        
+    def add_history(self, news_id):
+        self.history.append(news_id)       
+        
+   
+    def recommendations(self):
+        return 0
 
        
         
