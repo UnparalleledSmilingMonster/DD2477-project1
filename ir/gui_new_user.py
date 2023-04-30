@@ -5,7 +5,7 @@ import json
 
 
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Search, Q, Index
+from elasticsearch_dsl import Search, Q, Index, Document, Text, Keyword
 from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
 from search import query, recommendation
@@ -36,44 +36,64 @@ from PyQt5.QtCore import Qt
 # [{"user":"0", "preferences":[]}] : users.json default
 
 class User(Document):
+    """
+    Class to represent a user in elasticsearch. 
+    """
     username = Text()
-    preferences = 
-    history = 
+    preferences = Keyword(multi=True) #list equivalent
+    history = Keyword(multi=True)
 
-
-    def is_published(self):
-        return self.published and datetime.now() > self.published
-
-    @classmethod
-    def _matches(cls, hit):
-        # override _matches to match indices in a pattern instead of just ALIAS
-        # hit is the raw dict as returned by elasticsearch
-        return fnmatch(hit["_index"], PATTERN)
 
     class Index:
-        # we will use an alias instead of the index
-        name = ALIAS
-        # set settings and possibly other attributes of the index like
-        # analyzers
-        settings = {"number_of_shards": 1, "number_of_replicas": 0}
+        name = 'users'
+        settings = {
+          "number_of_shards": 1,
+        }
+
+    def save(self, ** kwargs):
+        return super(User, self).save(** kwargs)
+
+    def is_published(self):
+        return datetime.now() > self.published_from
+  
+
 
 
 def set_elastic_search(client):
+    User.init(using = client)
     index_user = Index("users")
     if not index_user.exists(using=client):
         print("Index 'users' does not exist yet. Creating it ...")
         index_user.create(using=client)
+    else:
+        print("Index 'users' found")
+    #user_0 = User(username="00", preferences = [], history = [])
+    #user_0.save(using = client)
     
+
+def list_user_es(client, index):
+    """
+    Returns list of all users in elasticsearch index 'users'
+    """
+    res = []
+    search = Search(using=client, index=index)
+    for elt in search.scan():
+        res.append(elt.username)
+    print(res)
     
-def check_user_es(client, index, username):
+
+    
+def check_user_es(client, index, user):
+    resp = Search(using=client, index=index).query("match", username=user).execute()
+    for elt in resp :
+        print(resp)
     
 
 def write_user_es(client, index, username, preferences, history = []):
     entry = {}
     entry["user"] = username
     entry["preferences"] = preferences
-    entry["history"] = history
-    
+    entry["history"] = history    
     json.dumps(entry).save(client = client, index = index)
         
 
@@ -121,6 +141,8 @@ class MainWindow(QWidget):
         self.tags_topics = tags_topics
         self.client =  Elasticsearch(address)
         set_elastic_search(self.client)
+        list_user_es(self.client, "users")
+        check_user_es(self.client, "users", "0")
         self.filename = user_fl 
         self.preferences = None
         self.index = index
