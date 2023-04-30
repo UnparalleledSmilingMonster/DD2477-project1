@@ -5,7 +5,7 @@ import json
 
 
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Search, Q, Index, Document, Text, Keyword
+from elasticsearch_dsl import Search, Q, Index, Document, Text, Keyword, UpdateByQuery
 from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
 from search import query, recommendation
@@ -33,7 +33,6 @@ from PyQt5.QtCore import QEventLoop
 from PyQt5.QtCore import Qt
 
 
-# [{"user":"0", "preferences":[]}] : users.json default
 
 class User(Document):
     """
@@ -85,17 +84,36 @@ def list_user_es(client, index):
     
 def check_user_es(client, index, user):
     resp = Search(using=client, index=index).query("match", username=user).execute()
-    for elt in resp :
-        print(resp)
-    
+    if len(resp) == 0 : return False, None, []     
+    elif len(resp) > 1 :
+        raise Exception("Error multiple users with the same name")
+    else :
+        user = resp[0]
+        #Regenerate missing fields (in the case where pref = [] or history = [], these fields do not exist)
+        if "preferences" not in user : user.preferences = []
+        if "history" not in user : user.history = []
+        return  True, user.preferences, user.history
+          
 
-def write_user_es(client, index, username, preferences, history = []):
-    entry = {}
-    entry["user"] = username
-    entry["preferences"] = preferences
-    entry["history"] = history    
-    json.dumps(entry).save(client = client, index = index)
-        
+def write_user_es(client, index, username, preferences, history = []):  
+    User(username=username, preferences = list(preferences) , history = history).save(using = client, index = index)
+
+
+def update_history(client, index, user, doc_id):
+    try:
+        #Think of creating the field history if it does not exist
+        ubq = UpdateByQuery(using=client, index=index).query("match", username=user).script(source="if (!ctx._source.containsKey(\"history\")) { ctx._source.history = params.history } else ctx._source.history.addAll(params.history)", params= {"history":[doc_id]})
+        ubq.execute()
+        Index(index).refresh(using = client)
+    
+    except Exception as e:
+        print(e)
+
+  
+
+######################### DEPRECATED : uses .json file to store users       
+
+# [{"user":"0", "preferences":[]}] : users.json default
 
 def check_user(filename, username):
     """ 
@@ -124,7 +142,8 @@ def write_user(filename, username, preferences):
         json.dump(entry, f, separators=(',',': '))
         f.write(']')
         f.close() 
-    
+
+################################################
     
 
 class MainWindow(QWidget):  
@@ -142,7 +161,6 @@ class MainWindow(QWidget):
         self.client =  Elasticsearch(address)
         set_elastic_search(self.client)
         list_user_es(self.client, "users")
-        check_user_es(self.client, "users", "0")
         self.filename = user_fl 
         self.preferences = None
         self.index = index
@@ -184,7 +202,7 @@ class MainWindow(QWidget):
             QMessageBox.about(self, "Warning", "No name provided.")
             return 
         
-        status, self.preferences, self.history  = check_user(self.filename, self.username)
+        status, self.preferences, self.history  = check_user_es(self.client, "users", self.username)
         if not status :  
             self.hide()
             self.ld_window = PreferencesWindow(self, self.tags_topics)
@@ -202,14 +220,8 @@ class MainWindow(QWidget):
             self.search_window.destroyed.connect(loop.quit)
             loop.exec() 
 
-        
-        
 
-        
-
-
-        
-        
+      
 ############################################################################
 
 class PreferencesWindow(QWidget):
@@ -272,7 +284,7 @@ class PreferencesWindow(QWidget):
             QMessageBox.about(self, "Cold start !", "Select at least 3 positive preferences.")
             return
             
-        write_user(self.parent.filename, self.parent.username, list(self.preferences))
+        write_user_es(self.parent.client, "users", self.parent.username, self.preferences, [])
         self.parent.search_window = SearchWindow(self.parent, self.tags_topics, self.preferences, self.parent.history)
         self.parent.search_window.show()
         self.hide() 
@@ -408,8 +420,8 @@ class SearchWindow(QWidget):
         self.add_history(self.mem[index-1])
         
     def add_history(self, news_id):
-        self.history.append(news_id)       
-        
+        update_history(self.parent.client, "users", self.parent.username, news_id)
+        self.history.append(news_id)            
    
     def recommendations(self):
         return 0
