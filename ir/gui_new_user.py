@@ -10,9 +10,6 @@ from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
 from search import query, recommendation
 
-import json
-
-
 from functools import partial
 
 from PyQt5.QtWidgets import QApplication
@@ -68,8 +65,8 @@ def set_elastic_search(client):
         index_user.create(using=client)
     else:
         print("Index 'users' found")
-    user_0 = User(username="0", preferences = [], history = [])
-    user_0.save(using = client)
+    #user_0 = User(username="0", preferences = [], history = [])
+    #user_0.save(using = client)
     
 
 def list_user_es(client, index):
@@ -314,7 +311,6 @@ class SearchWindow(QWidget):
         self.history = history
         self.set_window()
         self.define_widgets()
-        self.recommendations()
 
        
     def set_window(self):
@@ -325,9 +321,14 @@ class SearchWindow(QWidget):
 
 
     def define_widgets(self):
+        self.layout.setColumnStretch(0,1)
+        self.layout.setColumnStretch(1,2)
+        self.layout.setColumnStretch(2,1)
+        self.layout.setRowStretch(2,3)
+        
+        
         text = QLabel(text ="Query Search", parent = self)
-        self.layout.addWidget(text, 0 ,0)
-       
+        self.layout.addWidget(text, 0 ,0, alignment =Qt.AlignCenter)       
         
         self.text_input = QLineEdit(parent = self)
         self.text_input.setPlaceholderText('Use keywords')
@@ -343,24 +344,45 @@ class SearchWindow(QWidget):
         
                 
         self.stack = QStackedLayout()
-        self.layout.addLayout(self.stack, 2,1)      
-
-        self.text_field = QTextEdit(self)
-        self.text_field.setReadOnly(True)
-        self.stack.addWidget(self.text_field)
+        self.layout.addLayout(self.stack, 2,0,1,3)      
         
         self.list_search = QListWidget(parent = self)
         self.stack.addWidget(self.list_search)
         
-        self.previous = QPushButton("Previous", parent = self)
-        self.previous.clicked.connect(self.prev_list)
-        self.layout.addWidget(self.previous, 2, 2)
-        self.previous.hide()
+        self.text_field = QTextEdit(self)
+        self.text_field.setReadOnly(True)
+        self.stack.addWidget(self.text_field)
+        
+        self.stack_prev = QStackedLayout()
+        self.layout.addLayout(self.stack_prev, 1,0)    
+        
+        self.more_res = QPushButton("More results", parent = self)
+        self.more_res.clicked.connect(self.more_results)
+        self.stack_prev.addWidget(self.more_res)        
+        self.more_res.hide()
+        
+        self.previous = QPushButton("Back", parent = self)
+        self.previous.clicked.connect(self.text_to_list)
+        self.stack_prev.addWidget(self.previous)
+        
+        self.update = QPushButton("Update", parent = self)
+        self.update.clicked.connect(self.update_news)
+        self.layout.addWidget(self.update, 1,2)
+       
+        self.like = QPushButton("Like", parent = self)
+        self.like.clicked.connect(self.like_news)
+        self.layout.addWidget(self.like, 3,2)
+        self.like.hide()
+        
+        self.dislike = QPushButton("Dislike", parent = self)
+        self.dislike.clicked.connect(self.dislike_news)
+        self.layout.addWidget(self.dislike, 3,0)
+        self.dislike.hide()
         
         
         quit = QPushButton("Quit", parent = self)
         quit.clicked.connect(self.menu)
-        self.layout.addWidget(quit, 4,0)
+        self.layout.addWidget(quit, 4,1)
         
        
         self.setLayout(self.layout)
@@ -368,13 +390,37 @@ class SearchWindow(QWidget):
     def menu(self):   
         self.parent.show()
         self.close() 
+    
+    def update_news(self):
+        #TODO : update database of news
+        return 0
+       
+    def like_news(self):
+        self.liked = 1
         
-    def prev_list(self):
-        self.previous.hide()
+    def dislike_news(self):
+        self.liked = -1
+        
+    def list_to_text(self):
+        self.stack_prev.setCurrentIndex(1)
         self.stack.setCurrentIndex(1)
-        self.list_search.itemClicked.connect(self.read_article)
+        self.list_search.itemClicked.disconnect()
+        self.more_res.hide()
+        self.like.show()
+        self.dislike.show()
+        self.liked = 0
          
-      
+    def text_to_list(self):
+        self.stack_prev.setCurrentIndex(0)
+        self.stack.setCurrentIndex(0)       
+        self.list_search.itemClicked.connect(self.read_article)
+        self.like.hide()
+        self.dislike.hide()
+        self.more_res.show()
+        self.liked = 0      
+        
+    def more_results(self):
+        return 0
     
     def translate_preferences(self):
         pref_cat = {}
@@ -385,10 +431,9 @@ class SearchWindow(QWidget):
     
         
     def query_search(self):  
-        self.previous.hide()
-        self.stack.setCurrentIndex(1)
-
+        self.text_to_list()
         self.text_field.clear()
+        self.list_search.clear()
         search_query = self.text_input.text()
         if search_query == "":
             QMessageBox.about(self, "Warning", "No query input.")
@@ -414,10 +459,8 @@ class SearchWindow(QWidget):
        
             
     def read_article(self, item):
-        self.previous.show()
-        self.stack.setCurrentIndex(0)
+        self.list_to_text()
         index = int(item.text().split(" ")[0])
-        self.list_search.itemClicked.disconnect()
         self.text_field.clear()
         self.text_field.insertPlainText(self.searches[index-1].text)
         self.add_history(self.mem[index-1])
@@ -427,8 +470,8 @@ class SearchWindow(QWidget):
         self.history.append(news_id)            
    
     def recommendations(self):
+        self.text_to_list()
         q = Q()  # TODO filter dates to get recent articles
-        print(self.history)
         for i, id in enumerate(reversed(self.history)):
             if i == 0:
                 q = Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
@@ -450,11 +493,7 @@ class SearchWindow(QWidget):
         
         self.list_search.itemClicked.connect(self.read_article)
        
-        
-        
-        
-        
-    
+      
 ############################################################################
 
 
