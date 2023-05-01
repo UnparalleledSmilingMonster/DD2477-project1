@@ -313,6 +313,7 @@ class SearchWindow(QWidget):
         self.set_window()
         self.define_widgets()
         self.nb_elements = 30 #max number of hits per query
+        self.last_read = None #last doc read id
 
        
     def set_window(self):
@@ -399,27 +400,46 @@ class SearchWindow(QWidget):
        
     def like_news(self):
         self.liked = 1
+        self.like.setStyleSheet('QPushButton {background-color: green;}')
+        self.dislike.setStyleSheet('QPushButton {background-color: white;}')
         
     def dislike_news(self):
         self.liked = -1
+        self.dislike.setStyleSheet('QPushButton {background-color: red;}')
+        self.like.setStyleSheet('QPushButton {background-color: white;}')
+        
+    def reset_like(self):
+        self.like.setStyleSheet('QPushButton {background-color: white;}')
+        self.dislike.setStyleSheet('QPushButton {background-color: white;}')
+        self.liked = 0
+        
         
     def list_to_text(self):
+        self.read = True  #to know when the user is done reading 
         self.stack_prev.setCurrentIndex(1)
         self.stack.setCurrentIndex(1)
         self.list_search.itemClicked.disconnect()
         self.more_res.hide()
         self.like.show()
         self.dislike.show()
-        self.liked = 0
+        self.reset_like()
          
     def text_to_list(self):
+        if self.last_read != None and self.read:
+            if self.liked == 0 :
+                self.add_history(self.last_read)
+            if self.liked == 1 :
+                self.add_history(self.last_read)
+                self.add_history(self.last_read)
+            self.last_read = None           
+        self.read = False
         self.stack_prev.setCurrentIndex(0)
         self.stack.setCurrentIndex(0)       
         self.list_search.itemClicked.connect(self.read_article)
         self.like.hide()
         self.dislike.hide()
         self.more_res.show()
-        self.liked = 0      
+        self.reset_like()    
         
     def more_results(self):
         self.text_field.clear()
@@ -468,9 +488,10 @@ class SearchWindow(QWidget):
         index = int(item.text().split(" ")[0])
         self.text_field.clear()
         self.text_field.insertPlainText(self.response[index].text)
-        self.add_history(self.mem[index])
+        self.last_read = self.mem[index]
         
     def add_history(self, news_id):
+        print("saving article")
         update_history(self.parent.client, "users", self.parent.username, news_id)
         self.history.append(news_id)            
    
