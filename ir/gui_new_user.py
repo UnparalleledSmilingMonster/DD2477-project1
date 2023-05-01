@@ -299,9 +299,10 @@ class PreferencesWindow(QWidget):
 class SearchWindow(QWidget):
     """
     Window for the user to input search queries.
-    TODO : implement recommendation without query
-    TODO : add read articles to history (should add it to json user)
+    TODO : implement recommendation without query. DONE
+    TODO : add read articles to history (should add it to json user). DONE
     """
+    
     def __init__(self, parent, tags_topics, preferences, history):
         super().__init__()
         self.parent = parent
@@ -311,6 +312,7 @@ class SearchWindow(QWidget):
         self.history = history
         self.set_window()
         self.define_widgets()
+        self.nb_elements = 30 #max number of hits per query
 
        
     def set_window(self):
@@ -420,8 +422,13 @@ class SearchWindow(QWidget):
         self.liked = 0      
         
     def more_results(self):
-        return 0
-    
+        self.text_field.clear()
+        self.list_search.clear()
+        for index, hit in enumerate(self.search.scan()):
+            self.mem[index] = hit.meta.id
+            QListWidgetItem(str(index) + " " + hit.headline , self.list_search)
+        self.list_search.itemClicked.connect(self.read_article)
+        
     def translate_preferences(self):
         pref_cat = {}
         for i in range(len(self.preferences)):
@@ -444,16 +451,14 @@ class SearchWindow(QWidget):
             if value > 2:
                 should_list.append(Q("match", tags=key))
 
-        self.searches = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)).execute()
+        self.search = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0))
+        self.response = self.search[:self.nb_elements].execute()
         self.list_search.clear()
         self.mem = {} #stores articles ids
-        fcts = []
-        for i in range(len(self.searches)):
-            fcts.append(partial(self.read_article, i))
             
-        for index, hit in enumerate(self.searches):
-            self.mem[index-1] = hit.meta.id
-            QListWidgetItem(str(index) + " " + hit.headline , self.list_search)
+        for index, hit in enumerate(self.response):
+            self.mem[index] = hit.meta.id
+            QListWidgetItem(str(index) + " " + hit.headline + " | " + format(hit.meta.score, '.3f') , self.list_search)
         
         self.list_search.itemClicked.connect(self.read_article)
        
@@ -462,8 +467,8 @@ class SearchWindow(QWidget):
         self.list_to_text()
         index = int(item.text().split(" ")[0])
         self.text_field.clear()
-        self.text_field.insertPlainText(self.searches[index-1].text)
-        self.add_history(self.mem[index-1])
+        self.text_field.insertPlainText(self.response[index].text)
+        self.add_history(self.mem[index])
         
     def add_history(self, news_id):
         update_history(self.parent.client, "users", self.parent.username, news_id)
@@ -480,16 +485,14 @@ class SearchWindow(QWidget):
                 q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
                    "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(self.history))))
         
-        self.searches = Search(using=self.parent.client, index=self.parent.index).query(q).execute()
+        self.search = Search(using=self.parent.client, index=self.parent.index).query(q)
+        self.response = self.search[:self.nb_elements].execute()
         self.list_search.clear()
         self.mem = {} #stores articles ids
-        fcts = []
-        for i in range(len(self.searches)):
-            fcts.append(partial(self.read_article, i))
             
-        for index, hit in enumerate(self.searches):
-            self.mem[index-1] = hit.meta.id
-            QListWidgetItem(str(index) + " " + hit.headline , self.list_search)
+        for index, hit in enumerate(self.response):
+            self.mem[index] = hit.meta.id
+            QListWidgetItem(str(index) + " " + hit.headline + " | " + format(hit.meta.score, '.3f') , self.list_search)
         
         self.list_search.itemClicked.connect(self.read_article)
        
