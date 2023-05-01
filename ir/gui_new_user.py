@@ -491,7 +491,6 @@ class SearchWindow(QWidget):
         self.last_read = self.mem[index]
         
     def add_history(self, news_id):
-        print("saving article")
         update_history(self.parent.client, "users", self.parent.username, news_id)
         self.history.append(news_id)            
    
