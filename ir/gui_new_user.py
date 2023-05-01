@@ -56,6 +56,8 @@ class User(Document):
         return datetime.now() > self.published_from
   
 
+def reset_index(client, index):
+    client.indices.delete(index=index, ignore=[400, 404])
 
 
 def set_elastic_search(client):
@@ -66,8 +68,8 @@ def set_elastic_search(client):
         index_user.create(using=client)
     else:
         print("Index 'users' found")
-    #user_0 = User(username="00", preferences = [], history = [])
-    #user_0.save(using = client)
+    user_0 = User(username="0", preferences = [], history = [])
+    user_0.save(using = client)
     
 
 def list_user_es(client, index):
@@ -151,7 +153,7 @@ class MainWindow(QWidget):
     Main window. Login / Create user window.
     """  
 
-    def __init__(self, tags_topics, address, user_fl, index ):
+    def __init__(self, tags_topics, address, index ):
         super().__init__()
         self.layout = QGridLayout(self) 
         self.set_window()
@@ -159,9 +161,10 @@ class MainWindow(QWidget):
         self.username = "" 
         self.tags_topics = tags_topics
         self.client =  Elasticsearch(address)
+        #reset_index(self.client, "users") #for debug purposes
         set_elastic_search(self.client)
+        check_user_es(self.client, "users", "tim")
         list_user_es(self.client, "users")
-        self.filename = user_fl 
         self.preferences = None
         self.index = index
                 
@@ -424,8 +427,28 @@ class SearchWindow(QWidget):
         self.history.append(news_id)            
    
     def recommendations(self):
-        return 0
-
+        q = Q()  # TODO filter dates to get recent articles
+        print(self.history)
+        for i, id in enumerate(reversed(self.history)):
+            if i == 0:
+                q = Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
+                  "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(self.history))))  # TODO maybe have another scoring function
+            else:
+                q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
+                   "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(self.history))))
+        
+        self.searches = Search(using=self.parent.client, index=self.parent.index).query(q).execute()
+        self.list_search.clear()
+        self.mem = {} #stores articles ids
+        fcts = []
+        for i in range(len(self.searches)):
+            fcts.append(partial(self.read_article, i))
+            
+        for index, hit in enumerate(self.searches):
+            self.mem[index-1] = hit.meta.id
+            QListWidgetItem(str(index) + " " + hit.headline , self.list_search)
+        
+        self.list_search.itemClicked.connect(self.read_article)
        
         
         
@@ -437,7 +460,7 @@ class SearchWindow(QWidget):
 
 app = QApplication(sys.argv)
 tags = ["politics", "wellness", "entertainment", "travel", "style & beauty", "parenting", "healthy living", "queer voices", "food & drink", "business", "comedy", "sports", "black voices", "home & living", "parents"]
-gui_new_user = MainWindow(tags,"http://localhost:9200", "users.json", "new_news" )
+gui_new_user = MainWindow(tags,"http://localhost:9200", "new_news" )
 gui_new_user.show()
   
 # Run application's main loop
