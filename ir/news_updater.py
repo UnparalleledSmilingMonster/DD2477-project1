@@ -41,16 +41,20 @@ def get_text_news(link, div):
 
 ## Call this function to update the dataset.json file with new articles
 
-def read_new_articles(path='dataset.json'):
-    data = {}
+def read_new_articles(path='formated_dataset.json'):
+    links = []
+    data = []
     with open(path) as json_file:
-        data = json.load(json_file)
+        for obj in json_file:
+            dic = json.loads(obj)
+            data.append(dic)
+            links.append(dic['link'])
 
     for site, div in newsPages.items():
         nc = Newscatcher(website=site)
         result = nc.get_news()
         for article in result['articles']:
-            if article['link'] not in data:
+            if article['link'] not in links:
                 tags = []
                 if 'tags' in article:
                     for tag in article['tags']:
@@ -71,7 +75,8 @@ def read_new_articles(path='dataset.json'):
                     date = article['published_parsed']
                 else:
                     date = ''
-                if article['link'] not in data:
+
+                if article['link'] not in links:
                     if 'video' in article['link'] or 'live-news' in article['link'] or 'audio' in article['link']:
                         continue
                     else:
@@ -80,10 +85,18 @@ def read_new_articles(path='dataset.json'):
                         except:
                             text = ''
 
-                        data[article['link']] = {'headline': article['title'], 'text': text, 'tags': tags, 'summary': summary, 'authors': authors, 'date': date}
-            
+                        # remove all the newlines in text and headline
+                        text = text.replace('\n', ' ')
+                        article['title'] = article['title'].replace('\n', ' ')
+
+                        data.append({'link': article['link'], 'headline': article['title'], 'text': text, 'tags': tags, 'summary': summary, 'authors': authors, 'date': date})
+
+
     with open(path, 'w') as outfile:
-        json.dump(data, outfile, indent=4)
+        for obj in data:
+            json.dump(obj, outfile)
+            outfile.write('\n')
+
 
 if __name__ == "__main__":
     read_new_articles()

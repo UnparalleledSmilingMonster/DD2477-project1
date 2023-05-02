@@ -1,3 +1,4 @@
+from datetime import datetime
 import sys  
 import os
 import numpy as np
@@ -9,6 +10,7 @@ from elasticsearch_dsl import Search, Q, Index, Document, Text, Keyword, UpdateB
 from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
 from search import query, recommendation
+import news_updater as news_updater
 
 from functools import partial
 
@@ -396,6 +398,7 @@ class SearchWindow(QWidget):
     
     def update_news(self):
         #TODO : update database of news
+        news_updater.read_new_articles('formated_dataset.json')
         return 0
        
     def like_news(self):
