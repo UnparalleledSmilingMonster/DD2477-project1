@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+newscatcher/__init__.py
+newscatcher.egg-info/PKG-INFO
+newscatcher.egg-info/SOURCES.txt
+newscatcher.egg-info/dependency_links.txt
+newscatcher.egg-info/requires.txt
+newscatcher.egg-info/top_level.txt
+newscatcher/data/package_rss.db
