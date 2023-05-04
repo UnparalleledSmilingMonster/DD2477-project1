@@ -41,7 +41,7 @@ def get_text_news(link, div):
 
 ## Call this function to update the dataset.json file with new articles
 
-def read_new_articles(path='formated_dataset.json'):
+def read_new_articles(path='/formated_dataset.json'):
     links = []
     data = []
     with open(path) as json_file:
