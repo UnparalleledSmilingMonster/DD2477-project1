@@ -273,9 +273,9 @@ class PreferencesWindow(QWidget):
     def preference(self, k):  
         idx = self.tags_topics.index(self.buttons[k].text())
         if self.preferences[idx] == 0 :
-            self.preferences[idx] = 1
+            self.preferences[idx] = 3
             self.buttons[k].setStyleSheet('QPushButton {background-color: green;}')
-        elif self.preferences[idx] == 1 :
+        elif self.preferences[idx] == 3 :
             self.preferences[idx] = -1   
             self.buttons[k].setStyleSheet('QPushButton {background-color: red;}')     
         else : # -1
@@ -284,7 +284,7 @@ class PreferencesWindow(QWidget):
         
             
     def forward(self):
-        if len(self.preferences[self.preferences == 1]) < 3 :
+        if len(self.preferences[self.preferences == 3]) < 3 :
             QMessageBox.about(self, "Cold start !", "Select at least 3 positive preferences.")
             return
             
@@ -476,7 +476,8 @@ class SearchWindow(QWidget):
             QMessageBox.about(self, "Warning", "No query input.")
             pass
         should_list = []
-        preferences_categories = self.translate_preferences()           
+        preferences_categories = self.translate_preferences()  
+        print("pref", preferences_categories)         
         for key, value in preferences_categories.items():
             if value > 2:
                 should_list.append(Q("match", tags=key))
@@ -489,6 +490,7 @@ class SearchWindow(QWidget):
             QMessageBox.about(self, "Info", "Did you mean : " + suggestion + " ?")
             search_query = suggestion
 
+        print("should", should_list)
         self.search = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0))
         self.response = self.search[:self.nb_elements].execute() 
 
