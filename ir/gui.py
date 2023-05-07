@@ -525,15 +525,18 @@ class SearchWindow(QWidget):
             else:
                 q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
                    "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(self.history))))
-        
-        self.search = Search(using=self.parent.client, index=self.parent.index).query(q)
+        # https://stackoverflow.com/questions/66498900/filter-data-by-day-range-in-elasticsearch-using-python-dsl
+        num_of_days = 365*2
+        date_limit = Q("range",date={"gte": "now-%dd" % num_of_days,"lt": "now" })
+
+        self.search = Search(using=self.parent.client, index=self.parent.index).query(date_limit).query(q)
         self.response = self.search[:self.nb_elements].execute()
         self.list_search.clear()
         self.mem = {} #stores articles ids
             
         for index, hit in enumerate(self.response):
             self.mem[index] = hit.meta.id
-            QListWidgetItem(str(index) + " " + hit.headline + " | " + format(hit.meta.score, '.3f') , self.list_search)
+            QListWidgetItem(str(index) + " " + hit.headline + " (" + hit.date + ") | " + format(hit.meta.score, '.3f') , self.list_search)
         
         self.list_search.itemClicked.connect(self.read_article)
        
