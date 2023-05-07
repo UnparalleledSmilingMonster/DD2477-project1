@@ -271,7 +271,7 @@ class PreferencesWindow(QWidget):
     def preference(self, k):  
         idx = self.tags_topics.index(self.buttons[k].text())
         if self.preferences[idx] == 0 :
-            self.preferences[idx] = 1
+            self.preferences[idx] = 3
             self.buttons[k].setStyleSheet('QPushButton {background-color: green;}')
         elif self.preferences[idx] == 1 :
             self.preferences[idx] = -1   
