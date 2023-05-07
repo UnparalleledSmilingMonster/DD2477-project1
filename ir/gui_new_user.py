@@ -6,11 +6,13 @@ import json
 
 
 from elasticsearch import Elasticsearch
+from elasticsearch import helpers
 from elasticsearch_dsl import Search, Q, Index, Document, Text, Keyword, UpdateByQuery
 from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
 from search import query, recommendation
 import news_updater as news_updater
+from spelling_correction import Bigrams
 
 from functools import partial
 
@@ -317,6 +319,7 @@ class SearchWindow(QWidget):
         self.nb_elements = 30 #max number of hits per query
         self.last_read = None #last doc read id
 
+        self.spelling_corrector = Bigrams(new=False)
        
     def set_window(self):
         self.setWindowTitle("Search Window")
@@ -397,8 +400,12 @@ class SearchWindow(QWidget):
         self.close() 
     
     def update_news(self):
-        #TODO : update database of news
-        news_updater.read_new_articles('formated_dataset.json')
+        new_articles = news_updater.read_new_articles('ir/formated_dataset.json')
+        # add the new articles to the database
+        helpers.bulk(self.parent.client, new_articles, index="new_news")
+        message = "Added " + str(len(new_articles)) + " new articles to the database"
+        QMessageBox.about(self, "Update", message)
+        
         return 0
        
     def like_news(self):
@@ -473,9 +480,18 @@ class SearchWindow(QWidget):
         for key, value in preferences_categories.items():
             if value > 2:
                 should_list.append(Q("match", tags=key))
+        
+        list_search = search_query.split(" ")
+        suggestion = self.spelling_corrector.get_spelling_suggestions(tokens=list_search) # find suggested words, will only give alternatives if words are not present in the dataset
+        suggestion = " ".join(suggestion)
+
+        if suggestion != "" and suggestion != search_query:
+            QMessageBox.about(self, "Info", "Did you mean : " + suggestion + " ?")
+            search_query = suggestion
 
         self.search = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0))
-        self.response = self.search[:self.nb_elements].execute()
+        self.response = self.search[:self.nb_elements].execute() 
+
         self.list_search.clear()
         self.mem = {} #stores articles ids
             
