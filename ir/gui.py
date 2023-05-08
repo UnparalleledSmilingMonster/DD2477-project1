@@ -32,6 +32,7 @@ from PyQt5.QtCore import QEventLoop
 from PyQt5.QtCore import Qt
 
 
+tags_elastic_search = {'POLITICS': 0, 'WELLNESS': 1, 'ENTERTAINMENT': 2, 'TRAVEL': 3, 'STYLE & BEAUTY': 4, 'PARENTING': 5, 'HEALTHY LIVING': 6, 'QUEER VOICES': 7, 'FOOD & DRINK': 8, 'BUSINESS': 9, 'COMEDY': 10, 'SPORTS': 11, 'BLACK VOICES': 12, 'HOME & LIVING': 13, 'PARENTS': 14, 'U.S. NEWS': 15, 'TECH': 16, 'ARTS & CULTURE':17, 'WORLD NEWS':18, 'IMPACT':19, 'TASTE':20, 'WEIRD NEWS':21, 'RELIGION':22, 'CRIME':23, 'WOMEN':24, 'SCIENCE':25 }
 
 class User(Document):
     """
@@ -109,8 +110,27 @@ def update_history(client, index, user, doc_id):
     
     except Exception as e:
         print(e)
-
-  
+        
+def update_preferences(client, index, user, update_pref):
+    try:
+        #Think of creating the field preferences if it does not exist
+        ubq = UpdateByQuery(using=client, index=index).query("match", username=user).script(source="if (!ctx._source.containsKey(\"preferences\")){ ctx._source.preferences = params.preferences } else{ for (int i = 0; i < ctx._source.preferences.length; ++i){ ctx._source.preferences[i] += params.preferences[i]}}", params= {"preferences":update_pref})
+        ubq.execute()
+        Index(index).refresh(using = client)
+    except Exception as e:
+        print(e)
+        
+        
+def tags_to_preferences(doc_tags, power = 0.3, tags =tags_elastic_search):
+    """
+    Returns all the tags corresponding to a given document, formatted to match with the preferences format (one hot encoded)
+    """
+    L = np.zeros(len(tags))
+    for tag in doc_tags :
+        idx = tags.get(tag, -1)
+        if idx == -1 : continue
+        L[idx] = power
+    return list(L) 
 
 ######################### DEPRECATED : uses .json file to store users       
 
@@ -242,8 +262,8 @@ class PreferencesWindow(QWidget):
     def set_window(self):
         self.setWindowTitle("New User : Preferences")
         self.setGeometry(350, 550, 500, 300)
-        self.setFixedWidth(500)
-        self.setFixedHeight(300)         
+        self.setFixedWidth(600)
+        self.setFixedHeight(400)         
 
 
     def define_widgets(self):
@@ -256,9 +276,9 @@ class PreferencesWindow(QWidget):
         fct = []
         for i in range(len(self.tags_topics)):
             fct.append(partial(self.preference, i))
-            
-        for i in range(len(self.tags_topics)):
-            self.buttons.append(QPushButton(self.tags_topics[i], parent = self))
+        
+        for key, i in self.tags_topics.items():
+            self.buttons.append(QPushButton(key.lower(), parent = self))
             u = i // max_abs
             v = i % max_abs
             self.buttons[i].clicked.connect(fct[i])
@@ -269,7 +289,7 @@ class PreferencesWindow(QWidget):
     
     
     def preference(self, k):  
-        idx = self.tags_topics.index(self.buttons[k].text())
+        idx = self.tags_topics.get(self.buttons[k].text().upper())
         if self.preferences[idx] == 0 :
             self.preferences[idx] = 3
             self.buttons[k].setStyleSheet('QPushButton {background-color: green;}')
@@ -310,7 +330,13 @@ class SearchWindow(QWidget):
         self.parent = parent
         self.layout = QGridLayout(self) 
         self.tags_topics = tags_topics
+        self.idx_to_tags = {}
+        
+        for key,val in self.tags_topics.items():
+            self.idx_to_tags[val] = key
+            
         self.preferences = preferences
+        print(self.preferences)
         self.history = history
         self.set_window()
         self.define_widgets()
@@ -429,12 +455,8 @@ class SearchWindow(QWidget):
          
     def text_to_list(self):
         if self.last_read != None and self.read:
-            if self.liked == 0 :
-                self.add_history(self.last_read)
-            if self.liked == 1 :
-                self.add_history(self.last_read)
-                self.add_history(self.last_read)
-            self.last_read = None           
+                self.add_history(self.last_read, self.liked)
+        self.last_read = None           
         self.read = False
         self.stack_prev.setCurrentIndex(0)
         self.stack.setCurrentIndex(0)       
@@ -456,7 +478,7 @@ class SearchWindow(QWidget):
         pref_cat = {}
         for i in range(len(self.preferences)):
             if self.preferences[i] > 0 :
-                pref_cat[self.tags_topics[i]] = self.preferences[i]
+                pref_cat[self.idx_to_tags.get(i)] = self.preferences[i]
         return pref_cat
     
         
@@ -477,7 +499,7 @@ class SearchWindow(QWidget):
 
         print("should", should_list)
         self.search = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0))
-        self.response = self.search[:self.nb_elements].execute()
+        self.response = self.search[:self.nb_elements].execute() #restrict to nb_elements elements returned
         self.list_search.clear()
         self.mem = {} #stores articles ids
             
@@ -495,9 +517,17 @@ class SearchWindow(QWidget):
         self.text_field.insertPlainText(self.response[index].text)
         self.last_read = self.mem[index]
         
-    def add_history(self, news_id):
-        update_history(self.parent.client, "users", self.parent.username, news_id)
-        self.history.append(news_id)            
+    def add_history(self, news_id, liked):
+        doc_tags = Document.get(news_id, using = self.parent.client, index=self.parent.index).tags
+        doc_pref = tags_to_preferences(doc_tags)
+        if liked ==1 or liked == 0 : 
+            update_history(self.parent.client, "users", self.parent.username, news_id)
+            doc_pref = [x *(liked +1) for x in doc_pref]
+        else : doc_pref = [-x for x in doc_pref]        
+        update_preferences(self.parent.client, "users", self.parent.username, doc_pref)
+        self.history.append(news_id)   
+        self.preferences =[ a + b for a,b in zip(self.preferences,doc_pref)]
+
    
     def recommendations(self):
         self.text_to_list()
@@ -526,8 +556,8 @@ class SearchWindow(QWidget):
 
 
 app = QApplication(sys.argv)
-tags = ["politics", "wellness", "entertainment", "travel", "style & beauty", "parenting", "healthy living", "queer voices", "food & drink", "business", "comedy", "sports", "black voices", "home & living", "parents"]
-gui_new_user = MainWindow(tags,"http://localhost:9200", "new_news" )
+
+gui_new_user = MainWindow(tags_elastic_search,"http://localhost:9200", "new_news" )
 gui_new_user.show()
   
 # Run application's main loop
