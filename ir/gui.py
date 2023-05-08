@@ -483,7 +483,7 @@ class SearchWindow(QWidget):
     def translate_preferences(self):
         pref_cat = {}
         for i in range(len(self.preferences)):
-            if self.preferences[i] > 0 :
+            if np.abs(self.preferences[i]) > 0 :
                 pref_cat[self.idx_to_tags.get(i)] = self.preferences[i]
         return pref_cat
     
@@ -557,8 +557,18 @@ class SearchWindow(QWidget):
         # https://stackoverflow.com/questions/66498900/filter-data-by-day-range-in-elasticsearch-using-python-dsl
         num_of_days = 365*2
         date_limit = Q("range",date={"gte": "now-%dd" % num_of_days,"lt": "now" })
+        
+        dislike = []
+        preferences_categories = self.translate_preferences()  
+        for key, value in preferences_categories.items():
+            if value < 0:
+                dislike.append(Q("match", tags=key))
+        print("Dislike:",dislike)
+        if len(dislike)>0 :self.search = Search(using=self.parent.client, index=self.parent.index).query(date_limit)\
+        .query(q).query(Q('bool', must_not=dislike))
+        else : self.search = Search(using=self.parent.client, index=self.parent.index).query(date_limit).query(q)
 
-        self.search = Search(using=self.parent.client, index=self.parent.index).query(date_limit).query(q)
+        
         self.response = self.search[:self.nb_elements].execute()
         self.list_search.clear()
         self.mem = {} #stores articles ids
@@ -566,6 +576,7 @@ class SearchWindow(QWidget):
         for index, hit in enumerate(self.response):
             self.mem[index] = hit.meta.id
             QListWidgetItem(str(index) + " " + hit.headline + " (" + hit.date + ") | " + format(hit.meta.score, '.3f') , self.list_search)
+            print(hit.tags)
         
         self.list_search.itemClicked.connect(self.read_article)
        
