@@ -338,7 +338,6 @@ class SearchWindow(QWidget):
             self.idx_to_tags[val] = key
             
         self.preferences = preferences
-        print(self.preferences)
         self.history = history
         self.set_window()
         self.define_widgets()

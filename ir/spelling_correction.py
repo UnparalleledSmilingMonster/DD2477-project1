@@ -15,17 +15,17 @@ class Bigrams:
             self.bigrams_words_probs = {}
             self.bigrams_parts = {}
         else:
-            with open('ir/bigrams_data/unigrams_words_counts.json') as json_file:
+            with open('bigrams_data/unigrams_words_counts.json') as json_file:
                 self.unigrams_words_counts = json.load(json_file)
-            with open('ir/bigrams_data/bigrams_words_probs.json') as json_file:
+            with open('bigrams_data/bigrams_words_probs.json') as json_file:
                 self.bigrams_words_probs = json.load(json_file)
-            with open('ir/bigrams_data/bigrams_parts.json') as json_file:
+            with open('bigrams_data/bigrams_parts.json') as json_file:
                 self.bigrams_parts = json.load(json_file)
-            with open('ir/bigrams_data/bigrams_words_counts.json') as json_file:
+            with open('bigrams_data/bigrams_words_counts.json') as json_file:
                 self.bigrams_words_counts = json.load(json_file)
 
         self.tokenizer = TreebankWordTokenizer()
-        self.dictionary = enchant.Dict("en_US")
+        #self.dictionary = enchant.Dict("en_US") #Not useful anymore since the bigrams are already computed
 
     def tokenize_texts(self, text):
         tokens = self.tokenizer.tokenize(text)
