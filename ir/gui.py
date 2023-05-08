@@ -123,7 +123,7 @@ def update_preferences(client, index, user, update_pref):
         print(e)
         
         
-def tags_to_preferences(doc_tags, power = 0.3, tags =tags_elastic_search):
+def tags_to_preferences(doc_tags, power = 0.5, tags =tags_elastic_search):
     """
     Returns all the tags corresponding to a given document, formatted to match with the preferences format (one hot encoded)
     """
@@ -521,6 +521,7 @@ class SearchWindow(QWidget):
         for index, hit in enumerate(self.response):
             self.mem[index] = hit.meta.id
             QListWidgetItem(str(index) + " " + hit.headline + " | " + format(hit.meta.score, '.3f') , self.list_search)
+            #print(hit.tags)
         
         self.list_search.itemClicked.connect(self.read_article)
        
