@@ -44,6 +44,7 @@ def get_text_news(link, div):
 def read_new_articles(path='/formated_dataset.json'):
     links = []
     data = []
+    new_data =[]
     with open(path) as json_file:
         for obj in json_file:
             dic = json.loads(obj)
@@ -69,12 +70,22 @@ def read_new_articles(path='/formated_dataset.json'):
                 if 'summary' in article:
                     summary = article['summary']
                 else:
-                    summary = ''
+                    summary = 'empty'
 
                 if 'published_parsed' in article:
+                    # get the date on this format "date": "2017-10-13"
                     date = article['published_parsed']
+                    # make sure 6 is 06 in the string
+                    if date[1] < 10 and date[2] < 10:
+                        date = str(date[0]) + '-0' + str(date[1]) + '-0' + str(date[2])
+                    elif date[1] < 10:
+                        date = str(date[0]) + '-0' + str(date[1]) + '-' + str(date[2])
+                    elif date[2] < 10:
+                        date = str(date[0]) + '-' + str(date[1]) + '-0' + str(date[2])
+                    else:
+                        date = str(date[0]) + '-' + str(date[1]) + '-' + str(date[2])
                 else:
-                    date = ''
+                    continue
 
                 if article['link'] not in links:
                     if 'video' in article['link'] or 'live-news' in article['link'] or 'audio' in article['link']:
@@ -83,19 +94,23 @@ def read_new_articles(path='/formated_dataset.json'):
                         try:
                             text = get_text_news(article['link'], div)
                         except:
-                            text = ''
+                            text = 'empty'
 
                         # remove all the newlines in text and headline
                         text = text.replace('\n', ' ')
                         article['title'] = article['title'].replace('\n', ' ')
 
-                        data.append({'link': article['link'], 'headline': article['title'], 'text': text, 'tags': tags, 'summary': summary, 'authors': authors, 'date': date})
-
-
+                        new_data.append({'link': article['link'], 'headline': article['title'], 'text': text, 'tags': tags, 'summary': summary, 'authors': authors, 'date': date})
+                    
     with open(path, 'w') as outfile:
         for obj in data:
             json.dump(obj, outfile)
             outfile.write('\n')
+        for obj in new_data:
+            json.dump(obj, outfile)
+            outfile.write('\n')
+
+    return new_data
 
 
 if __name__ == "__main__":
