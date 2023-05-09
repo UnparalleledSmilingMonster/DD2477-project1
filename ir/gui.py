@@ -512,7 +512,9 @@ class SearchWindow(QWidget):
             search_query = suggestion
 
         print("should", should_list)
-        self.search = Search(using=self.parent.client, index=self.parent.index).query(Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0))
+        query = Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)
+        query |= Q('bool', must=[Q('match', text=search_query)], should=should_list, minimum_should_match=0)
+        self.search = Search(using=self.parent.client, index=self.parent.index).query(query)
 
         self.response = self.search[:self.nb_elements].execute() #restrict to nb_elements elements returned
         self.list_search.clear()
