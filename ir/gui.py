@@ -34,7 +34,17 @@ from PyQt5.QtCore import QEventLoop
 from PyQt5.QtCore import Qt
 
 
-tags_elastic_search = {'POLITICS': 0, 'WELLNESS': 1, 'ENTERTAINMENT': 2, 'TRAVEL': 3, 'STYLE & BEAUTY': 4, 'PARENTING': 5, 'HEALTHY LIVING': 6, 'QUEER VOICES': 7, 'FOOD & DRINK': 8, 'BUSINESS': 9, 'COMEDY': 10, 'SPORTS': 11, 'BLACK VOICES': 12, 'HOME & LIVING': 13, 'PARENTS': 14, 'U.S. NEWS': 15, 'TECH': 16, 'ARTS & CULTURE':17, 'WORLD NEWS':18, 'IMPACT':19, 'TASTE':20, 'WEIRD NEWS':21, 'RELIGION':22, 'CRIME':23, 'WOMEN':24, 'SCIENCE':25 }
+tags_elastic_search = {'POLITICS': 0, 'WELLNESS': 1, 'ENTERTAINMENT': 2, 'TRAVEL': 3, 'STYLE & BEAUTY': 4, 'EDUCATION': 5, 'HEALTHY LIVING': 6, 'QUEER VOICES': 7, 'FOOD & DRINK': 8, 'BUSINESS': 9, 'COMEDY': 10, 'SPORTS': 11, 'BLACK VOICES': 12, 'HOME & LIVING': 13, 'PARENTS': 14, 'U.S. NEWS': 15, 'TECH': 16, 'ARTS & CULTURE':17, 'WORLD NEWS':18, 'MEDIA':19, 'TASTE':20, 'WEIRD NEWS':21, 'RELIGION':22, 'CRIME':23, 'WOMEN':24, 'SCIENCE':25 }
+
+def load_artificial_documents(filename):
+    """ 
+    Used in conjunction with a preference. Returns a doc id corresponding to the preference.
+    """
+    with open(filename, 'r') as f:
+        return json.load(f)  
+        
+        
+artificial_docs = load_artificial_documents("artificial_documents.json")
 
 class User(Document):
     """
@@ -133,6 +143,8 @@ def tags_to_preferences(doc_tags, power = 0.5, tags =tags_elastic_search):
         if idx == -1 : continue
         L[idx] = power
     return list(L) 
+    
+
 
 ######################### DEPRECATED : uses .json file to store users       
 
@@ -523,8 +535,7 @@ class SearchWindow(QWidget):
         for index, hit in enumerate(self.response):
             self.mem[index] = hit.meta.id
             QListWidgetItem(str(index) + " " + hit.headline + " | " + format(hit.meta.score, '.3f') , self.list_search)
-            #print(hit.tags)
-        
+            print(index, hit.tags)
         self.list_search.itemClicked.connect(self.read_article)
        
             
@@ -534,6 +545,7 @@ class SearchWindow(QWidget):
         self.text_field.clear()
         self.text_field.insertPlainText(self.response[index].text)
         self.last_read = self.mem[index]
+        print(self.mem[index])
         
     def add_history(self, news_id, liked):
         doc_tags = Document.get(news_id, using = self.parent.client, index=self.parent.index).tags
@@ -549,24 +561,31 @@ class SearchWindow(QWidget):
    
     def recommendations(self):
         self.text_to_list()
-        q = Q()  # TODO filter dates to get recent articles
-        for i, id in enumerate(reversed(self.history)):
-            if i == 0:
-                q = Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
-                  "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(self.history))))  # TODO maybe have another scoring function
-            else:
-                q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
-                   "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(self.history))))
-        # https://stackoverflow.com/questions/66498900/filter-data-by-day-range-in-elasticsearch-using-python-dsl
-        num_of_days = 365*2
-        date_limit = Q("range",date={"gte": "now-%dd" % num_of_days,"lt": "now" })
-        
         dislike = []
+        artificial_read = []
         preferences_categories = self.translate_preferences()  
         for key, value in preferences_categories.items():
             if value < 0:
                 dislike.append(Q("match", tags=key))
+            elif value >=3:
+                artificial_read.append(artificial_docs[key])                
+                
         print("Dislike:",dislike)
+        full_hist = artificial_read+self.history
+        
+        q = Q()  # TODO filter dates to get recent articles
+        for i, id in enumerate(reversed(full_hist)):
+            if i == 0:
+                q = Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
+                  "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))  # TODO maybe have another scoring function
+            else:
+                q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
+                   "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))
+        # https://stackoverflow.com/questions/66498900/filter-data-by-day-range-in-elasticsearch-using-python-dsl
+        num_of_days = 365*2
+        date_limit = Q("range",date={"gte": "now-%dd" % num_of_days,"lt": "now" })
+        
+
         if len(dislike)>0 :self.search = Search(using=self.parent.client, index=self.parent.index).query(date_limit)\
         .query(q).query(Q('bool', must_not=dislike))
         else : self.search = Search(using=self.parent.client, index=self.parent.index).query(date_limit).query(q)
