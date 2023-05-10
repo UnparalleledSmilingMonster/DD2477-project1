@@ -512,12 +512,31 @@ class SearchWindow(QWidget):
                 should_list.append(Q("match", tags=key))
         
         list_search = search_query.split(" ")
-        suggestion = self.spelling_corrector.get_spelling_suggestions(tokens=list_search) # find suggested words, will only give alternatives if words are not present in the dataset
-        suggestion = " ".join(suggestion)
 
-        if suggestion != "" and suggestion != search_query:
-            QMessageBox.about(self, "Info", "Did you mean : " + suggestion + " ?")
-            search_query = suggestion
+        if len(list_search) == 1:
+            query = Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)
+            query |= Q('bool', must=[Q('match', text=search_query)], should=should_list, minimum_should_match=0)
+            self.search = Search(using=self.parent.client, index=self.parent.index).query(query)
+            self.response = self.search[:self.nb_elements].execute() #restrict to nb_elements elements returned
+            self.list_search.clear()
+            # check if self.response is empty
+            if len(self.response) == 0:
+                suggestion = self.spelling_corrector.get_spelling_suggestions(tokens=list_search) # find suggested words, will only give alternatives if words are not present in the dataset
+                suggestion = " ".join(suggestion)
+
+                if suggestion != "" and suggestion != search_query:
+                    QMessageBox.about(self, "Info", "Did you mean : " + suggestion + " ?")
+                    search_query = suggestion
+            else:
+                search_query = list_search[0]
+            
+        else:
+            suggestion = self.spelling_corrector.get_spelling_suggestions(tokens=list_search) # find suggested words, will only give alternatives if words are not present in the dataset
+            suggestion = " ".join(suggestion)
+
+            if suggestion != "" and suggestion != search_query:
+                QMessageBox.about(self, "Info", "Did you mean : " + suggestion + " ?")
+                search_query = suggestion
 
         print("should", should_list)
         query = Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)
