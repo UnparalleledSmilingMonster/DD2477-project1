@@ -513,6 +513,7 @@ class SearchWindow(QWidget):
         
         list_search = search_query.split(" ")
 
+        # only search for suggestions if the one word does not return results
         if len(list_search) == 1:
             query = Q('bool', must=[Q('match', headline=search_query)], should=should_list, minimum_should_match=0)
             query |= Q('bool', must=[Q('match', text=search_query)], should=should_list, minimum_should_match=0)
