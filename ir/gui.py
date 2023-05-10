@@ -39,10 +39,20 @@ def load_artificial_documents(filename):
     """ 
     Used in conjunction with a preference. Returns a doc id corresponding to the preference.
     """
+    docs = {}
     with open(filename, 'r') as f:
-        return json.load(f)  
-        
+        data= json.load(f)  
+        for key,value in data.items():
+            resp = Search(using=Elasticsearch("http://localhost:9200"), index="new_news").query("match_phrase", headline=value).execute()
+            if len(resp) != 1 : 
+                docs[key] = "ERROR"       
+            else : 
+                docs[key] = resp[0].meta.id
+    return docs
+              
+          
 artificial_docs = load_artificial_documents("artificial_documents.json")
+print(artificial_docs)
 
 class User(Document):
     """
