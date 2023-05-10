@@ -181,6 +181,9 @@ class Bigrams:
             for token in tokens:
                 if token.lower() not in self.unigrams_words_counts:
                     misspelled_words.append(token)
+
+            if len(misspelled_words) == 0:
+                return tokens
             
             suggestions = []
             for word in tokens:
