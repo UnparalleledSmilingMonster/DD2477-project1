@@ -10,7 +10,6 @@ from elasticsearch import helpers
 from elasticsearch_dsl import Search, Q, Index, Document, Text, Keyword, UpdateByQuery
 from elasticsearch_dsl.query import MoreLikeThis
 from math import asin, pi
-from search import query, recommendation
 import news_updater as news_updater
 from spelling_correction import Bigrams
 
@@ -334,8 +333,6 @@ class PreferencesWindow(QWidget):
 class SearchWindow(QWidget):
     """
     Window for the user to input search queries.
-    TODO : implement recommendation without query. DONE
-    TODO : add read articles to history (should add it to json user). DONE
     """
     
     def __init__(self, parent, tags_topics, preferences, history):
@@ -573,11 +570,11 @@ class SearchWindow(QWidget):
         full_hist = artificial_read+self.history
         print(full_hist)
         
-        q = Q()  # TODO filter dates to get recent articles
+        q = Q()  
         for i, id in enumerate(reversed(full_hist)):
             if i == 0:
                 q = Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
-                  "tags", "authors", "headline","text"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))  # TODO maybe have another scoring function
+                  "tags", "authors", "headline","text"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))  
             else:
                 q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
                    "tags", "authors", "headline", "text"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))
