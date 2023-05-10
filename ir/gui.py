@@ -43,7 +43,6 @@ def load_artificial_documents(filename):
     with open(filename, 'r') as f:
         return json.load(f)  
         
-        
 artificial_docs = load_artificial_documents("artificial_documents.json")
 
 class User(Document):
@@ -53,7 +52,6 @@ class User(Document):
     username = Text()
     preferences = Keyword(multi=True) #list equivalent
     history = Keyword(multi=True)
-
 
     class Index:
         name = 'users'
@@ -67,6 +65,7 @@ class User(Document):
     def is_published(self):
         return datetime.now() > self.published_from
   
+######################### USEFUL FUNCTIONS FOR ELASTIC SEARCH ################################
 
 def reset_index(client, index):
     client.indices.delete(index=index, ignore=[400, 404])
@@ -106,7 +105,7 @@ def check_user_es(client, index, user):
         #Regenerate missing fields (in the case where pref = [] or history = [], these fields do not exist)
         if "preferences" not in user : user.preferences = []
         if "history" not in user : user.history = []
-        return  True, user.preferences, user.history
+        return  True, list(user.preferences), list(user.history)
           
 
 def write_user_es(client, index, username, preferences, history = []):  
@@ -157,7 +156,7 @@ def check_user(filename, username):
     with open(filename, 'r') as f:
         data = json.load(f)  
         for entry in data:  
-            if entry["user"] == username : return True, entry["preferences"], entry["history"]
+            if entry["user"] == username : return True, list(entry["preferences"]), list(entry["history"])
         f.close()
     return False, None, []
     
@@ -196,7 +195,7 @@ class MainWindow(QWidget):
         self.client =  Elasticsearch(address)
         #reset_index(self.client, "users") #for debug purposes
         set_elastic_search(self.client)
-        check_user_es(self.client, "users", "tim")
+        #check_user_es(self.client, "users", "tim")
         list_user_es(self.client, "users")
         self.preferences = None
         self.index = index
@@ -569,19 +568,22 @@ class SearchWindow(QWidget):
                 dislike.append(Q("match", tags=key))
             elif value >=3:
                 artificial_read.append(artificial_docs[key])                
-                
+
         print("Dislike:",dislike)
         full_hist = artificial_read+self.history
+        print(full_hist)
         
         q = Q()  # TODO filter dates to get recent articles
         for i, id in enumerate(reversed(full_hist)):
             if i == 0:
                 q = Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
-                  "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))  # TODO maybe have another scoring function
+                  "tags", "authors", "headline","text"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))  # TODO maybe have another scoring function
             else:
                 q |= Q(MoreLikeThis(like={"_index": self.parent.index, "_id": id.strip()}, fields=[
-                   "tags", "authors", "headline"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))
+                   "tags", "authors", "headline", "text"], min_term_freq=1, min_doc_freq=1, boost=pi/2-asin(i/len(full_hist))))
         # https://stackoverflow.com/questions/66498900/filter-data-by-day-range-in-elasticsearch-using-python-dsl
+        
+        
         num_of_days = 365*2
         date_limit = Q("range",date={"gte": "now-%dd" % num_of_days,"lt": "now" })
         
@@ -598,7 +600,7 @@ class SearchWindow(QWidget):
         for index, hit in enumerate(self.response):
             self.mem[index] = hit.meta.id
             QListWidgetItem(str(index) + " " + hit.headline + " (" + hit.date + ") | " + format(hit.meta.score, '.3f') , self.list_search)
-            print(hit.tags)
+            print(index, hit.tags)
         
         self.list_search.itemClicked.connect(self.read_article)
        
