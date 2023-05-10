@@ -48,7 +48,7 @@ class User(Document):
     """
     Class to represent a user in elasticsearch. 
     """
-    username = Text()
+    username = Keyword(index=False, multi = False)
     preferences = Keyword(multi=True) #list equivalent
     history = Keyword(multi=True)
 
@@ -192,7 +192,7 @@ class MainWindow(QWidget):
         self.username = "" 
         self.tags_topics = tags_topics
         self.client =  Elasticsearch(address)
-        #reset_index(self.client, "users") #for debug purposes
+        reset_index(self.client, "users") #for debug purposes
         set_elastic_search(self.client)
         #check_user_es(self.client, "users", "tim")
         list_user_es(self.client, "users")
@@ -549,9 +549,9 @@ class SearchWindow(QWidget):
         if liked ==1 or liked == 0 : 
             update_history(self.parent.client, "users", self.parent.username, news_id)
             doc_pref = [x *(liked +1) for x in doc_pref]
+            self.history.append(news_id)   
         else : doc_pref = [-x for x in doc_pref]        
         update_preferences(self.parent.client, "users", self.parent.username, doc_pref)
-        self.history.append(news_id)   
         self.preferences =[ a + b for a,b in zip(self.preferences,doc_pref)]
 
    
@@ -593,11 +593,13 @@ class SearchWindow(QWidget):
         self.response = self.search[:self.nb_elements].execute()
         self.list_search.clear()
         self.mem = {} #stores articles ids
-            
-        for index, hit in enumerate(self.response):
-            self.mem[index] = hit.meta.id
-            QListWidgetItem(str(index) + " " + hit.headline + " (" + hit.date + ") | " + format(hit.meta.score, '.3f') , self.list_search)
-            print(index, hit.tags)
+        with open("evaluation/eval_"+self.parent.username, 'w') as f:
+            for index, hit in enumerate(self.response[:10]):
+                self.mem[index] = hit.meta.id
+                QListWidgetItem(str(index) + " " + hit.headline + " (" + hit.date + ") | " + format(hit.meta.score, '.3f') , self.list_search)
+                f.write(str(index) + " " + hit.headline+ " - " + str(hit.tags) +"-\n")
+                print(index, hit.tags)
+        
         
         self.list_search.itemClicked.connect(self.read_article)
        
