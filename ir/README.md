@@ -19,9 +19,12 @@ The user should have a version of elasticsearch up to date (>= 8). The dataset i
 ## Running the recommender engine
 Execute `python gui.py` in the **ir** directory of the repository. The first window is for the login, type in a username. If the username already exists, it will load the corresponding profile. Otherwise, a new window opens for the creation of the new user profile. One has to indicate what he likes (1 click) and what he dislikes (2 clicks). At least 3 likes are necessary to fine tune the profile. After this step, the search window opens, the buttons are self-explanatory. 
 
-
 ## Evaluation 
 You can find the articles rated in the directory **evaluation** for the recommendation relevance part.
+
+## Issues you may run through :
+- Depending from where you run the program, you can have errors with files not found for the spelling correction. Go inside **spelling_correction.py** and fix the paths to the bigrams and unigrams **.json* files.
+- The *update* functions works well but has the same issue with paths. Modify accordingly **news_updater.py**
 
 ## Disclaimer:
 When we started the project we forked elasticsearch because we thought we would have to directly modify the repository. That is why our commits are only done in branch 7.14 on the forked repo. (There was a bit of a mixup)
