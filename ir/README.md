@@ -22,11 +22,11 @@ Execute `python gui.py` in the **ir** directory of the repository. The first win
 ## Evaluation 
 You can find the articles rated in the directory **evaluation** for the recommendation relevance part.
 
-## Issues you may run through :
+## Issues you may run through
 - Depending from where you run the program, you can have errors with files not found for the spelling correction. Go inside **spelling_correction.py** and fix the paths to the bigrams and unigrams **.json* files.
 - The *update* functions works well but has the same issue with paths. Modify accordingly **news_updater.py**
 
-## Disclaimer:
+## Disclaimer
 When we started the project we forked elasticsearch because we thought we would have to directly modify the repository. That is why our commits are only done in branch 7.14 on the forked repo. (There was a bit of a mixup)
 
 
