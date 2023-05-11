@@ -20,7 +20,7 @@ The user should have a version of elasticsearch up to date (>= 8). The dataset i
 Execute `python gui.py` in the **ir** directory of the repository. The first window is for the login, type in a username. If the username already exists, it will load the corresponding profile. Otherwise, a new window opens for the creation of the new user profile. One has to indicate what he likes (1 click) and what he dislikes (2 clicks). At least 3 likes are necessary to fine tune the profile. After this step, the search window opens, the buttons are self-explanatory. 
 
 
-##Evaluation 
+## Evaluation 
 You can find the articles rated in the directory **evaluation** for the recommendation relevance part.
 
 ## Disclaimer:
