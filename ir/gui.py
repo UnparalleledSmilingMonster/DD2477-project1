@@ -122,6 +122,7 @@ def write_user_es(client, index, username, preferences, history = []):
 
 
 def update_history(client, index, user, doc_id):
+    """Updates the user's history"""
     try:
         #Think of creating the field history if it does not exist
         ubq = UpdateByQuery(using=client, index=index).query("match", username=user).script(source="if (!ctx._source.containsKey(\"history\")) { ctx._source.history = params.history } else ctx._source.history.addAll(params.history)", params= {"history":[doc_id]})
@@ -132,6 +133,7 @@ def update_history(client, index, user, doc_id):
         print(e)
         
 def update_preferences(client, index, user, update_pref):
+    """Updates the user's preferences"""
     try:
         #Think of creating the field preferences if it does not exist
         ubq = UpdateByQuery(using=client, index=index).query("match", username=user).script(source="if (!ctx._source.containsKey(\"preferences\")){ ctx._source.preferences = params.preferences } else{ for (int i = 0; i < ctx._source.preferences.length; ++i){ ctx._source.preferences[i] += params.preferences[i]}}", params= {"preferences":update_pref})
@@ -468,6 +470,7 @@ class SearchWindow(QWidget):
         
         
     def list_to_text(self):
+        """Make appear the text of the article and hide the list of articles"""
         self.read = True  #to know when the user is done reading 
         self.stack_prev.setCurrentIndex(1)
         self.stack.setCurrentIndex(1)
@@ -478,6 +481,7 @@ class SearchWindow(QWidget):
         self.reset_like()
          
     def text_to_list(self):
+        """Make appear the list of articles and hide the text of the article."""
         if self.last_read != None and self.read:
                 self.add_history(self.last_read, self.liked)
         self.last_read = None           
@@ -491,6 +495,7 @@ class SearchWindow(QWidget):
         self.reset_like()    
         
     def more_results(self):
+        """To get more results for the search"""
         self.text_field.clear()
         self.list_search.clear()
         for index, hit in enumerate(self.search.scan()):
@@ -499,6 +504,7 @@ class SearchWindow(QWidget):
         self.list_search.itemClicked.connect(self.read_article)
         
     def translate_preferences(self):
+        """From array to dictionnary """
         pref_cat = {}
         for i in range(len(self.preferences)):
             if np.abs(self.preferences[i]) > 0 :
@@ -507,6 +513,7 @@ class SearchWindow(QWidget):
     
         
     def query_search(self):  
+        """Query search implementation"""
         self.text_to_list()
         self.text_field.clear()
         self.list_search.clear()
@@ -566,6 +573,7 @@ class SearchWindow(QWidget):
        
             
     def read_article(self, item):
+        """Display text of an article when clicked"""
         self.list_to_text()
         index = int(item.text().split(" ")[0])
         self.text_field.clear()
@@ -574,6 +582,7 @@ class SearchWindow(QWidget):
         print(self.mem[index])
         
     def add_history(self, news_id, liked):
+        """Updates the user's profile given what he read"""
         doc_tags = Document.get(news_id, using = self.parent.client, index=self.parent.index).tags
         doc_pref = tags_to_preferences(doc_tags)
         if liked ==1 or liked == 0 : 
@@ -586,6 +595,7 @@ class SearchWindow(QWidget):
 
    
     def recommendations(self):
+        """Recommendation function implementation """
         self.text_to_list()
         dislike = []
         artificial_read = []
