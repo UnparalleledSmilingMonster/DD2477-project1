@@ -204,7 +204,7 @@ class MainWindow(QWidget):
         self.username = "" 
         self.tags_topics = tags_topics
         self.client =  Elasticsearch(address)
-        reset_index(self.client, "users") #for debug purposes
+        # reset_index(self.client, "users") #for debug purposes
         set_elastic_search(self.client)
         #check_user_es(self.client, "users", "tim")
         list_user_es(self.client, "users")
