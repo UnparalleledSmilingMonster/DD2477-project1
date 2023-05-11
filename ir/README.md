@@ -13,7 +13,7 @@ The following Python packages are necessary (the versions provided are the ones 
 
 
 ## Installs
-The user should have a version of elasticsearch up to date (>= 8). The dataset is available on the GitHub [repository](https://github.com/UnparalleledSmilingMonster/DD2477-project1/tree/7.14/ir) under the name **formatted_dataset.json**. It should be manually uploaded to elasticsearch using Kibana, name the index **"new_news"**. Note that an instance of elasticsearch must be online before one runs the news recommendation engine. You must run elasticsearch on your computer WITHOUT security. It can be done by adding `xpack.security.enabled: false` to config/elasticsearch.yaml
+The user should have a version of elasticsearch up to date (>= 8). You can either download it from [here](https://www.elastic.co/downloads/elasticsearch) or build it using from the sources. The dataset is available on the GitHub [repository](https://github.com/UnparalleledSmilingMonster/DD2477-project1/tree/7.14/ir) under the name **formatted_dataset.json**. It should be manually uploaded to elasticsearch using Kibana, name the index **"new_news"**. Note that an instance of elasticsearch must be online before one runs the news recommendation engine. You must run elasticsearch on your computer WITHOUT security. It can be done by adding `xpack.security.enabled: false` to config/elasticsearch.yaml
 
 
 ## Running the recommender engine
