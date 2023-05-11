@@ -52,7 +52,7 @@ def load_artificial_documents(filename):
               
           
 artificial_docs = load_artificial_documents("artificial_documents.json")
-print(artificial_docs)
+#print(artificial_docs)
 
 class User(Document):
     """

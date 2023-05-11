@@ -1,6 +1,29 @@
-# How to setup
+## Packages
+This engine is coded with Python 3.
+The following Python packages are necessary (the versions provided are the ones we use, we cannot ensure the engine will run properly on different versions) :
+- elasticsearch, elasticsearch-dsl : `pip install elasticsearch==7.17.9 elasticsearch-dsl==7.4.1`
+- numpy : `pip install numpy==1.21.2`
+- pyQt : `pip install pyqt5==5.15.7`
+- nltk : `pip install nltk==3.7`
+- pyenchant : Necessary only if you want to rebuild the bigrams. In that case, uncomment line 28 in **spelling_correction.py**  `pip install pyenchant` 
+- beautifulsoup : `pip install beautifulsoup4`
+- pandas : `pip install pandas`
+- requests : `pip install requests`
+- newscatcher : Do not install it with pip as there is a version issue. `pip install feedparser --upgrade` `python newsPack/setup.py install`. You may have to move the **newscatcher** directory to get it found by Python. 
 
-1. install `elasticsearch` and `elasticsearch-dsl` via PIP
-2. start elasticsearch on your computer WITHOUT security. Can be done by adding `xpack.security.enabled: false` to config/elasticsearch.yaml (assuming that you downloaded the client from https://www.elastic.co/downloads/elasticsearch)
-3. if you have not previously, upload the [formatted_dataset.json](./formated_dataset.json) to elasticsearch and name it `new_news` (easy to do with kibana)
-4. start the python program and search
+
+## Installs
+The user should have a version of elasticsearch up to date (>= 8). The dataset is available on the GitHub [repository](https://github.com/UnparalleledSmilingMonster/DD2477-project1/tree/7.14/ir) under the name **formatted_dataset.json**. It should be manually uploaded to elasticsearch using Kibana, name the index **"new_news"**. Note that an instance of elasticsearch must be online before one runs the news recommendation engine. You must run elasticsearch on your computer WITHOUT security. It can be done by adding `xpack.security.enabled: false` to config/elasticsearch.yaml
+
+
+## Running the recommender engine
+Execute `python gui.py` in the **ir** directory of the repository. The first window is for the login, type in a username. If the username already exists, it will load the corresponding profile. Otherwise, a new window opens for the creation of the new user profile. One has to indicate what he likes (1 click) and what he dislikes (2 clicks). At least 3 likes are necessary to fine tune the profile. After this step, the search window opens, the buttons are self-explanatory. 
+
+
+##Evaluation 
+You can find the articles rated in the directory **evaluation** for the recommendation relevance part.
+
+## Disclaimer:
+When we started the project we forked elasticsearch because we thought we would have to directly modify the repository. That is why our commits are only done in branch 7.14 on the forked repo. (There was a bit of a mixup)
+
+
