@@ -204,7 +204,7 @@ class MainWindow(QWidget):
         self.username = "" 
         self.tags_topics = tags_topics
         self.client =  Elasticsearch(address)
-        reset_index(self.client, "users") #for debug purposes
+        #reset_index(self.client, "users") #for debug purposes
         set_elastic_search(self.client)
         #check_user_es(self.client, "users", "tim")
         list_user_es(self.client, "users")
@@ -589,9 +589,11 @@ class SearchWindow(QWidget):
             update_history(self.parent.client, "users", self.parent.username, news_id)
             doc_pref = [x *(liked +1) for x in doc_pref]
             self.history.append(news_id)   
-        else : doc_pref = [-x for x in doc_pref]        
+        else : doc_pref = [-x for x in doc_pref]       
+        print(doc_pref) 
         update_preferences(self.parent.client, "users", self.parent.username, doc_pref)
         self.preferences =[ a + b for a,b in zip(self.preferences,doc_pref)]
+        print(self.preferences)
 
    
     def recommendations(self):
@@ -599,7 +601,8 @@ class SearchWindow(QWidget):
         self.text_to_list()
         dislike = []
         artificial_read = []
-        preferences_categories = self.translate_preferences()  
+        preferences_categories = self.translate_preferences() 
+        print(preferences_categories) 
         for key, value in preferences_categories.items():
             if value < 0:
                 dislike.append(Q("match", tags=key))
@@ -621,7 +624,7 @@ class SearchWindow(QWidget):
         # https://stackoverflow.com/questions/66498900/filter-data-by-day-range-in-elasticsearch-using-python-dsl
         
         
-        num_of_days = 365*2
+        num_of_days = 365*3
         date_limit = Q("range",date={"gte": "now-%dd" % num_of_days,"lt": "now" })
         
 
